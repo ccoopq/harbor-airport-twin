@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Harbor–Airport Line Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a transit control room. Destination-sign header, one live bench (cameras | city map + cabin),
+   a strip map of the line that drives a stop-by-stop ledger, then the evidence (load, OD, re-ID, configs).
+   Route line = harbour blue; the bus = signal amber; boarding green / alighting red are semantic only. */
+:root {
+  --paper: #eef1f3;
+  --panel: #ffffff;
+  --ink: #16202a;
+  --muted: #5b6875;
+  --rule: #d4dbe1;
+  --line: #0b6e99;
+  --line-soft: #d9ebf3;
+  --bus: #e9a100;
+  --on: #1e8656;
+  --off: #c4433a;
+  --warn: #b7791f;
+  --city: #e3e7ea;
+  --block: #d5dbdf;
+  --water: #c9dfea;
+  --park: #d4e6cf;
+  --sign: #16202a;
+  --sign-fg: #eef1f3;
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1216; --panel: #141b21; --ink: #e5ebef; --muted: #93a0ab; --rule: #26313a;
+    --line: #45a9d6; --line-soft: #14303d; --bus: #f4b630; --on: #47c084; --off: #ee6f63; --warn: #e3a64a;
+    --city: #182026; --block: #212b33; --water: #16323f; --park: #1b3020; --sign: #1c2731; --sign-fg: #e5ebef; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1216; --panel: #141b21; --ink: #e5ebef; --muted: #93a0ab; --rule: #26313a;
+  --line: #45a9d6; --line-soft: #14303d; --bus: #f4b630; --on: #47c084; --off: #ee6f63; --warn: #e3a64a;
+  --city: #182026; --block: #212b33; --water: #16323f; --park: #1b3020; --sign: #1c2731; --sign-fg: #e5ebef; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15.5px; line-height: 1.6;
+  padding-inline: 18px; padding-block: 0 56px; }
+.wrap { max-width: 1280px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.005em; }
+h3 { font-size: 1.15rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+section { padding-block: 34px 6px; display: grid; gap: 16px; }
+section > header { display: grid; gap: 6px; }
+
+/* destination sign */
+.sign { margin-inline: -18px; padding-inline: 18px; padding-block: 16px 18px; background: var(--sign); color: var(--sign-fg); }
+.sign .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; justify-content: space-between; }
+.sign .name { display: flex; align-items: center; gap: 14px; }
+.badge { display: inline-grid; place-items: center; min-width: 46px; height: 46px; padding-inline: 8px; border-radius: 8px;
+  background: var(--line); color: #fff; font-family: var(--f-display); font-weight: 700; font-size: 1.5rem; }
+.sign h1 { font-size: clamp(1.7rem, 4.2vw, 2.6rem); font-weight: 700; }
+.sign h1 span { color: var(--bus); }
+.sign .eyebrow { color: color-mix(in srgb, var(--sign-fg) 68%, transparent); }
+.lede { padding-block: 26px 0; display: grid; gap: 22px; }
+.headline { font-family: var(--f-display); font-weight: 700; font-size: clamp(2rem, 5.2vw, 3.4rem); line-height: 1.05;
+  text-wrap: balance; max-width: 30ch; }
+.headline em { font-style: normal; color: var(--line); }
+.flow { list-style: none; margin: 0; padding: 0; display: flex; align-items: stretch; }
+.flow .step { flex: 1 1 0; min-width: 0; display: grid; gap: 6px; align-content: start;
+  padding: 12px 14px 14px; background: var(--panel); border: 1px solid var(--rule); border-top: 3px solid var(--line); border-radius: 8px; }
+.flow .n { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.09em; color: var(--muted); }
+.flow .k { font-family: var(--f-display); font-weight: 700; font-size: 1.3rem; line-height: 1.05; }
+.flow .m { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); line-height: 1.45; }
+.flow .opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.flow .opt { font-family: var(--f-mono); font-size: 0.7rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); }
+.flow .opt.on { background: var(--line); border-color: var(--line); color: var(--panel); }
+.flow .step.out { background: var(--line-soft); border-color: var(--line); border-top-color: var(--bus); }
+.flow .arrow { flex: 0 0 30px; display: grid; place-items: center; color: var(--line); }
+.flow .arrow svg { width: 22px; height: 14px; }
+@media (max-width: 760px) {
+  .flow { flex-direction: column; }
+  .flow .step { flex: none; }
+  .flow .arrow { flex: 0 0 24px; }
+  .flow .arrow svg { transform: rotate(90deg); }
+}
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin-top: 18px; }
+.kpi { background: var(--panel); padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.kpi .v { font-family: var(--f-display); font-size: 2.1rem; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.kpi .v small { font-size: 1.05rem; color: var(--muted); font-weight: 600; }
+.kpi .l { font-size: 0.9rem; color: var(--muted); }
+
+/* live bench */
+.bench { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.screen { background: #0b0f12; border-radius: 8px; overflow: hidden; position: relative; aspect-ratio: 8 / 3; max-width: 100%; }
+.screen video { width: 100%; height: 100%; display: block; object-fit: contain; }
+.screen .nov { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa5ae; font-family: var(--f-mono); font-size: 0.85rem; padding: 20px; text-align: center; }
+.screen .now { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.tag { font-family: var(--f-mono); font-size: 0.74rem; padding: 3px 8px; border-radius: 4px; background: rgba(12, 16, 20, 0.78); color: #f0f3f5; }
+.tag.door { background: var(--bus); color: #1a1406; font-weight: 600; }
+.side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; min-width: 0; align-items: start; }
+@media (max-width: 860px) { .side { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.card .eyebrow { margin-bottom: 6px; }
+#map { width: 100%; height: auto; display: block; }
+#cabin { width: 100%; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.loadnow { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+.loadnow b { font-family: var(--f-display); font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+
+.controls { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 10px 12px; align-items: center; margin-top: 10px; }
+@media (max-width: 640px) { .controls { grid-template-columns: auto minmax(0, 1fr) auto; } #speed { display: none; } }
+button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible, .stopbtn:focus-visible { outline: 2px solid var(--line); outline-offset: 2px; }
+#play { min-width: 76px; font-weight: 600; background: var(--line); color: #fff; border-color: var(--line); }
+.scrub { position: relative; min-width: 0; }
+.scrub input { width: 100%; accent-color: var(--line); }
+.ticks { position: relative; height: 10px; margin-inline: 8px; }
+.ticks span { position: absolute; top: 0; width: 2px; height: 8px; background: var(--muted); opacity: 0.6; transform: translateX(-1px); }
+#clock { font-family: var(--f-mono); font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+
+/* strip map */
+.strip { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 6px 4px; }
+.strip svg { display: block; min-width: 860px; width: 100%; height: auto; }
+.stopbtn { cursor: pointer; }
+.stopbtn text { font-family: var(--f-body); }
+
+/* ledger */
+.ledger { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .ledger { grid-template-columns: minmax(0, 1fr); } }
+.ledger h3 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ledger h3 .mono { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+.people { display: grid; gap: 8px; margin-top: 10px; }
+.pcard { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px; border-radius: 6px; background: color-mix(in srgb, var(--paper) 55%, var(--panel)); }
+.face { width: 46px; height: 82px; border-radius: 4px; background-color: var(--block); background-repeat: no-repeat; }
+.pcard .who { font-weight: 600; }
+.pcard .trip { font-size: 0.88rem; color: var(--muted); }
+.chip { display: inline-block; font-family: var(--f-mono); font-size: 0.72rem; padding: 2px 7px; border-radius: 999px; margin-top: 3px; border: 1px solid currentColor; }
+.chip.ok { color: var(--on); } .chip.bad { color: var(--off); } .chip.mid { color: var(--warn); }
+.chipkey { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--rule); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 6px 22px; font-size: 0.82rem; color: var(--muted); }
+.chipkey div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.chipkey dt, .chipkey dd { margin: 0; }
+.chipkey .chip { margin-top: 0; }
+.extra { font-size: 0.88rem; color: var(--muted); margin-top: 8px; }
+.stophead { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; }
+.stophead h3 { font-size: 1.5rem; }
+
+/* charts */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.od { width: 100%; height: auto; display: block; }
+.note { font-size: 0.92rem; color: var(--muted); }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+.tablebox { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; }
+th, td { text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 210px; }
+th { font-family: var(--f-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; }
+tr.main td { font-weight: 600; background: var(--line-soft); }
+td .sd { color: var(--muted); font-size: 0.8rem; }
+ul.plain { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; max-width: 75ch; }
+/* lift switch in the sign */
+.liftsw { display: grid; gap: 6px; justify-items: start; }
+.seg { display: inline-flex; border: 1px solid color-mix(in srgb, var(--sign-fg) 35%, transparent); border-radius: 8px; overflow: hidden; }
+.seg button { background: transparent; color: var(--sign-fg); border: 0; border-radius: 0; padding: 8px 14px;
+  font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; letter-spacing: 0.02em; }
+.seg button + button { border-left: 1px solid color-mix(in srgb, var(--sign-fg) 35%, transparent); }
+.seg button[aria-pressed="true"] { background: var(--bus); color: #1a1406; }
+.seg button:focus-visible { outline: 2px solid var(--bus); outline-offset: -4px; }
+.modenote { padding: 10px 14px; border-radius: 8px; background: var(--line-soft); font-size: 0.95rem; max-width: none; }
+.modenote b { font-family: var(--f-display); font-size: 1.05rem; letter-spacing: 0.02em; }
+
+/* 3D cabin */
+.view3d { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 7; min-height: 280px; border-radius: 6px; overflow: hidden;
+  background: var(--paper); touch-action: none; cursor: grab; }
+.view3d:active { cursor: grabbing; }
+.view3d canvas { width: 100%; height: 100%; display: block; }
+.view3d .nov { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--f-mono); font-size: 0.85rem; }
+.view3d .nov[hidden], #labels3d[hidden] { display: none; }
+#labels3d { position: absolute; inset: 0; pointer-events: none; }
+#labels3d span { position: absolute; transform: translate(-50%, -100%); font-family: var(--f-mono); font-size: 0.72rem; font-weight: 600;
+  padding: 1px 5px; border-radius: 3px; background: var(--panel); color: var(--ink); border: 1.5px solid currentColor; white-space: nowrap; }
+.controls3d { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.controls3d .grp { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.controls3d button { padding: 5px 10px; font-size: 0.88rem; }
+.controls3d label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; color: var(--muted); cursor: pointer; }
+.controls3d .hint { margin-left: auto; font-size: 0.82rem; color: var(--muted); }
+@media (max-width: 640px) { .view3d { aspect-ratio: 4 / 3; } .controls3d .hint { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<header class="sign">
+  <div class="wrap">
+    <div class="name">
+      <div><div class="eyebrow">Simulated city bus · 4 cabin + 2 kerb cameras · 20 stops</div>
+        <h1>Harbor–Airport Line <span>twin</span></h1></div></div>
+    <div class="liftsw"><div class="eyebrow">3D from a single camera</div>
+      <div class="seg" role="group" aria-label="Single-camera 3D method">
+        <button id="liftgeo" type="button" aria-pressed="true">Geometric lift</button>
+        <button id="lifts3d" type="button" aria-pressed="false">SAM 3D Body</button></div></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="lede">
+    <p class="headline">6 cameras. 64 passengers. Every trip, <em>from images alone.</em></p>
+    <ol class="flow" aria-label="Pipeline">
+      <li class="step"><span class="n">01</span><span class="k">6 cameras</span><span class="m">4 cabin · 2 kerb</span></li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 22 14"><path d="M1 7h18M13 1.5 19.5 7 13 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="step"><span class="n">02</span><span class="k">Track</span><span class="m">McByte++</span></li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 22 14"><path d="M1 7h18M13 1.5 19.5 7 13 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="step"><span class="n">03</span><span class="k">Pose</span><span class="m">RTMPose</span></li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 22 14"><path d="M1 7h18M13 1.5 19.5 7 13 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="step"><span class="n">04</span><span class="k">3D lift</span><span class="opts"><span class="opt" id="optgeo">geometric</span><span class="opt" id="opts3d">SAM 3D Body</span></span></li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 22 14"><path d="M1 7h18M13 1.5 19.5 7 13 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="step"><span class="n">05</span><span class="k">Re-identify</span><span class="m">TransReID</span></li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 22 14"><path d="M1 7h18M13 1.5 19.5 7 13 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="step out"><span class="n">06</span><span class="k">Digital twin</span><span class="m">3D positions · door events · trips</span></li>
+    </ol>
+  </div>
+  <div class="kpis" id="kpis"></div>
+
+  <section aria-labelledby="live-h">
+    <header><h2 id="live-h">Cameras, bus position and cabin, in sync</h2>
+      <p class="note">Top row: the front door from outside, then the two front cabin cameras; bottom row: the same for the rear door. Numbers are the twin's IDs, projected back from its 3D model: filled for people on board, outlined for people it is following outside. Pick a stop on the line below to jump there.</p></header>
+    <div class="bench">
+      <div>
+        <div class="screen"><video id="vid" muted playsinline preload="auto"></video>
+          <div class="nov" id="novideo" hidden>Camera videos are not in this build.</div>
+          <div class="now"><span class="tag" id="tagstop">—</span><span class="tag door" id="tagdoor" hidden>Doors open</span></div></div>
+        <div class="controls">
+          <button id="play" type="button">Play</button>
+          <select id="speed" aria-label="Playback speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select>
+          <div class="scrub"><input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Time along the route"><div class="ticks" id="ticks"></div></div>
+          <span id="clock">0:00</span>
+        </div>
+      </div>
+      <div class="side">
+        <div class="card"><div class="eyebrow">Bus position</div><svg id="map" viewBox="0 0 1000 640" role="img" aria-label="City map with the line and the bus"></svg></div>
+        <div class="card"><div class="eyebrow">Cabin from above</div>
+          <canvas id="cabin" width="900" height="250" aria-label="Top view of the cabin"></canvas>
+          <div class="loadnow"><span>On board <b id="ngt">0</b> <span class="note">true</span></span><span><b id="ntw">0</b> <span class="note">twin</span></span></div>
+          <div class="legend"><span><i style="background:transparent;border:2px solid var(--muted)"></i>true position</span><span><i style="background:var(--line)"></i>twin, with its ID</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="body-h">
+    <header><h2 id="body-h">The cabin in 3D</h2><p class="note" id="bodynote"></p></header>
+    <div class="card">
+      <div class="view3d" id="view3d"><canvas id="c3d" aria-label="3D view of the bus with the twin's passengers"></canvas><div id="labels3d"></div>
+        <div class="nov" id="no3d" hidden>The 3D view needs WebGL, which this browser did not provide.</div></div>
+      <div class="controls3d">
+        <div class="grp" role="group" aria-label="Viewpoint">
+          <button type="button" data-view="all">Whole bus</button><button type="button" data-view="front">Front door</button>
+          <button type="button" data-view="rear">Rear door</button><button type="button" data-view="top">From above</button></div>
+        <label><input type="checkbox" id="truth3d"> True positions</label>
+        <label><input type="checkbox" id="ids3d" checked> IDs</label>
+        <span class="hint">Drag to turn · scroll or pinch to zoom</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="line-h">
+    <header><h2 id="line-h">Who got on and off where</h2>
+      <p class="note">Bars are the true boardings (up) and alightings (down); dots are what the twin counted. Click a stop.</p></header>
+    <div class="strip"><svg id="strip" viewBox="0 0 1260 312" role="img" aria-label="Line diagram with boardings and alightings per stop"></svg></div>
+    <div class="card">
+      <div class="stophead"><h3 id="sname">—</h3><span class="mono note" id="sinfo"></span></div>
+      <div class="ledger">
+        <div><h3>Got on <span class="mono" id="onsum"></span></h3><div class="people" id="onlist"></div><div class="extra" id="onextra"></div></div>
+        <div><h3>Got off <span class="mono" id="offsum"></span></h3><div class="people" id="offlist"></div><div class="extra" id="offextra"></div></div>
+      </div>
+      <dl class="chipkey">
+        <div><dt><span class="chip ok">twin ID 3</span></dt><dd>Boarding seen; the twin calls this person 3. The ID may change on the way; what counts is the exit match.</dd></div>
+        <div><dt><span class="chip bad">boarding missed</span></dt><dd>The twin did not see this person get on.</dd></div>
+        <div><dt><span class="chip ok">recognised · boarded at …</span></dt><dd>Exit seen and matched by appearance to this person's own boarding: a closed trip.</dd></div>
+        <div><dt><span class="chip bad">matched to someone who boarded at …</span></dt><dd>Exit seen but matched to another person's boarding (or a false one).</dd></div>
+        <div><dt><span class="chip mid">not matched; their boarding was missed</span></dt><dd>Exit seen; there was no boarding to match it to, so the twin left it open.</dd></div>
+        <div><dt><span class="chip mid">not matched to a boarding</span></dt><dd>Both seen, but the looks were not similar enough (or the boarding went to someone else), so the twin left it open.</dd></div>
+        <div><dt><span class="chip bad">alighting missed</span></dt><dd>The twin did not see this person get off.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section aria-labelledby="load-h">
+    <header><h2 id="load-h">How many are on board, minute by minute</h2></header>
+    <div class="card"><svg id="load" class="chart" viewBox="0 0 1000 260" role="img" aria-label="On-board count over the route, true and twin"></svg>
+      <div class="legend"><span><i style="background:var(--ink)"></i>true count</span><span><i style="background:var(--line)"></i>twin count</span></div></div>
+  </section>
+
+  <section aria-labelledby="od-h">
+    <header><h2 id="od-h">Where trips start and end</h2>
+      <p id="odnote">The twin builds a trip each time one of its passenger IDs boards and later alights.</p></header>
+    <div class="two">
+      <div class="card"><div class="eyebrow">True trips</div><svg id="odgt" class="od" viewBox="0 0 420 420" role="img" aria-label="True origin-destination matrix"></svg></div>
+      <div class="card"><div class="eyebrow">Twin trips</div><svg id="odtw" class="od" viewBox="0 0 420 420" role="img" aria-label="Twin origin-destination matrix"></svg></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="reid-h">
+    <header><h2 id="reid-h">Recognising a passenger at the exit</h2>
+      <p id="reidnote"></p></header>
+    <div class="two">
+      <div class="card"><div class="eyebrow">Appearance only: rank-1 vs number of candidates (axis starts at 80%)</div><svg id="curve" class="chart" viewBox="0 0 520 300" role="img" aria-label="Rank-1 accuracy against gallery size"></svg><div class="legend" id="curvelegend"></div></div>
+      <div class="card"><div class="eyebrow">Trips closed end to end, by configuration</div><div id="tripbars"></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="cfg-h">
+    <header><h2 id="cfg-h">Configurations on the same route</h2>
+      <p class="note">Same render and detections, different inputs to the twin. Mean of the runs; ± is the spread.</p></header>
+    <div class="tablebox"><table id="cfg"></table></div>
+  </section>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  // which single-camera 3D method the twin used: '#s3d' in the link selects SAM 3D Body
+  const LIFT = location.hash === '#s3d' ? '_s3d' : '';
+  let tStart = 0;
+  try { tStart = +sessionStorage.getItem('twin_t') || 0; sessionStorage.removeItem('twin_t'); } catch (e) { /* storage blocked */ }
+  $('liftgeo').setAttribute('aria-pressed', String(!LIFT)); $('lifts3d').setAttribute('aria-pressed', String(!!LIFT));
+  let D;
+  try { D = await (await fetch(`data${LIFT}.json`)).json(); }
+  catch (e) { $('kpis').textContent = `Could not load data${LIFT}.json`; return; }
+  const R = D.route, fps = D.fps, N = D.n, S = R.stops.length;
+  const T = N / fps;
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const main = D.table.find((r) => r.note === 'main') || D.table[0] || {};
+  const other = D.table.find((r) => r.label !== main.label && /lift \+ TransReID/.test(r.label)) || {};
+  const t1 = (v) => (+v).toFixed(1);
+  $(LIFT ? 'opts3d' : 'optgeo').classList.add('on');
+  // ---------------------------------------------------------------- KPIs
+  const k = (v, sub, l) => `<div class="kpi"><div class="v">${v}${sub ? ` <small>${sub}</small>` : ''}</div><div class="l">${l}</div></div>`;
+  const pct = (a) => `${(a * 100).toFixed(1)}%`;
+  $('kpis').innerHTML = [
+    k(`${(+main.trips_linked_reid).toFixed(1)}`, `/ ${main.trips_total}`, `trips closed correctly: the person getting off is matched to their own boarding (mean of ${main.runs || 3} runs)`),
+    k(`${(+main.events_tp).toFixed(1)}`, `/ ${main.events_gt}`, `door events found, ${(main.events_pred - main.events_tp).toFixed(1)} false (mean of ${main.runs || 3} runs)`),
+    k((+main.onboard_count_mae).toFixed(2), '', `mean error of the on-board count; exact ${pct(main.onboard_count_exact)} of the time`),
+    k(pct(main.od_acc_reid), '', 'of true origin–destination trips reproduced by the twin'),
+  ].join('');
+
+  // ---------------------------------------------------------------- people helpers
+  const sw = D.sprite.w, sh = D.sprite.h;
+  const face = (pid) => { const p = D.people[pid]; const sc = 46 / sw;
+    return `<div class="face" style="background-image:url(people.jpg);background-size:${Object.keys(D.people).length * sw * sc}px ${sh * sc}px;background-position:-${p.thumb * sw * sc}px 0"></div>`; };
+  const tripOf = {}; D.trips.forEach((t) => { tripOf[t.pid] = t; });
+
+  // ---------------------------------------------------------------- map
+  const map = $('map');
+  (function drawMap() {
+    const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+    el('rect', { x: 0, y: 0, width: 1000, height: 640, fill: 'var(--city)' }, map);
+    for (let x = 10; x < 1000; x += 52) for (let y = 10; y < 640; y += 44) {
+      if (rnd() < 0.12) continue;
+      el('rect', { x, y, width: 40 + rnd() * 6, height: 33 + rnd() * 5, rx: 3, fill: 'var(--block)' }, map);
+    }
+    el('path', { d: 'M -10 505 C 160 470 260 520 400 486 S 640 400 740 430 S 930 500 1010 470 L 1010 520 C 920 548 820 482 740 478 S 520 470 400 530 S 150 520 -10 555 Z', fill: 'var(--water)' }, map);
+    [[620, 40, 120, 90], [120, 120, 150, 110], [840, 330, 120, 80]].forEach(([x, y, w, h]) => el('rect', { x, y, width: w, height: h, rx: 10, fill: 'var(--park)' }, map));
+    const lab = (x, y, t) => { const e = el('text', { x, y, 'font-size': 17, 'font-family': 'var(--f-display)', fill: 'var(--muted)', 'letter-spacing': '0.12em' }, map); e.textContent = t; };
+    lab(40, 455, 'HARBOR'); lab(160, 92, 'OLD TOWN'); lab(420, 360, 'CENTRE'); lab(640, 30, 'UNIVERSITY'); lab(860, 590, 'RIVERSIDE'); lab(860, 50, 'AIRPORT');
+    const wp = R.map.waypoints.map((p) => p.join(',')).join(' ');
+    el('polyline', { points: wp, fill: 'none', stroke: 'var(--panel)', 'stroke-width': 14, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, map);
+    el('polyline', { points: wp, fill: 'none', stroke: 'var(--line)', 'stroke-width': 8, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, map);
+    R.map.stops.forEach(([x, y], i) => {
+      const g = el('g', { class: 'stopbtn', tabindex: 0, role: 'button', 'aria-label': `Stop ${i + 1} ${R.stops[i]}` }, map);
+      el('circle', { cx: x, cy: y, r: 9, fill: 'var(--panel)', stroke: 'var(--line)', 'stroke-width': 4, id: `mstop${i}` }, g);
+      g.addEventListener('click', () => selectStop(i, true));
+      if (i === 0 || i === S - 1) {
+        const t = el('text', { x: i ? x - 14 : x + 6, y: i ? y + 40 : y + 40, 'font-size': 24, fill: 'var(--ink)', 'font-family': 'var(--f-display)', 'font-weight': 600, 'text-anchor': i ? 'end' : 'start' }, g);
+        t.textContent = R.stops[i];
+      }
+    });
+  })();
+  const nowLab = el('text', { 'font-size': 26, 'font-family': 'var(--f-display)', 'font-weight': 700, fill: 'var(--ink)', stroke: 'var(--panel)', 'stroke-width': 6, 'paint-order': 'stroke' }, map);
+  const busG = el('g', {}, map);
+  el('circle', { r: 20, fill: 'var(--bus)', opacity: 0.25 }, busG);
+  el('rect', { x: -15, y: -9, width: 30, height: 18, rx: 5, fill: 'var(--bus)', stroke: 'var(--ink)', 'stroke-width': 2 }, busG);
+  // arc length along the map polyline for each stop: the bus moves along the line between stops
+  const WP = R.map.waypoints; const cum = [0];
+  for (let i = 1; i < WP.length; i++) cum.push(cum[i - 1] + Math.hypot(WP[i][0] - WP[i - 1][0], WP[i][1] - WP[i - 1][1]));
+  const stopArc = R.stop_km.map((km) => km / R.stop_km[S - 1] * cum[cum.length - 1]);
+  const atArc = (u) => { let i = 0; while (i < cum.length - 2 && cum[i + 1] < u) i++; const w = (u - cum[i]) / (cum[i + 1] - cum[i]);
+    return [WP[i][0] + w * (WP[i + 1][0] - WP[i][0]), WP[i][1] + w * (WP[i + 1][1] - WP[i][1])]; };
+  function busAt(f) {
+    const s = R.s[Math.min(f, N - 1)]; let i = 0;
+    while (i < S - 2 && R.s_stop[i + 1] <= s) i++;
+    const w = Math.max(0, Math.min(1, (s - R.s_stop[i]) / (R.s_stop[i + 1] - R.s_stop[i])));
+    return { k: i + (w >= 1 ? 1 : 0), w, xy: atArc(stopArc[i] + w * (stopArc[i + 1] - stopArc[i])) };
+  }
+
+  // ---------------------------------------------------------------- cabin
+  const cv = $('cabin'), cx = cv.getContext('2d');
+  function drawCabin(f) {
+    const W = cv.width, H = cv.height, L = D.bus.L, BW = D.bus.W, m = 24;
+    const sx = (x) => m + x / L * (W - 2 * m), sy = (y) => H / 2 - y / BW * (H - 2 * m) * 1.0;
+    cx.clearRect(0, 0, W, H);
+    cx.fillStyle = css('--paper'); cx.strokeStyle = css('--muted'); cx.lineWidth = 2;
+    cx.beginPath(); cx.roundRect(sx(0), sy(BW / 2), sx(L) - sx(0), sy(-BW / 2) - sy(BW / 2), 14); cx.fill(); cx.stroke();
+    cx.strokeStyle = css('--bus'); cx.lineWidth = 6;
+    Object.values(D.doors).forEach(([a, b]) => { cx.beginPath(); cx.moveTo(sx(a), sy(BW / 2)); cx.lineTo(sx(b), sy(BW / 2)); cx.stroke(); });
+    cx.fillStyle = css('--rule');
+    D.seats.forEach(([x, y]) => { cx.fillRect(sx(x - 0.2), sy(y + 0.19), sx(0.4) - sx(0), sy(-0.19) - sy(0.19)); });
+    cx.fillStyle = css('--muted'); cx.font = '600 15px ' + css('--f-mono');
+    cx.fillText('◀ FRONT', 2, sy(-BW / 2) + 22); cx.fillText('doors', sx(9.0), sy(BW / 2) - 8);
+    const fr = D.cabin[Math.min(Math.floor(f / D.cabin_step), D.cabin.length - 1)];
+    if (!fr) return;
+    const [g, e] = fr;
+    cx.lineWidth = 2.5; cx.strokeStyle = css('--muted');
+    g.forEach(([pid, x, y]) => { cx.beginPath(); cx.arc(sx(x), sy(y), 13, 0, 7); cx.stroke(); });
+    e.forEach(([id, x, y]) => {
+      cx.fillStyle = css('--line'); cx.beginPath(); cx.arc(sx(x), sy(y), 9, 0, 7); cx.fill();
+      cx.fillStyle = css('--ink'); cx.font = '600 14px ' + css('--f-mono'); cx.fillText(String(id), sx(x) + 10, sy(y) - 9);
+    });
+    $('ngt').textContent = g.length; $('ntw').textContent = e.length;
+  }
+
+  // ---------------------------------------------------------------- 3D cabin
+  // bus frame: x along the bus (front = 0), y across (+ = kerb / door side), z up -> three.js (x, z, -y), centred on the bus
+  $('bodynote').textContent = LIFT
+    ? 'Each passenger is drawn with the body SAM 3D Body estimated from one camera image of them, renewed twice a second and carried by the twin\'s track in between. Plain figures are people the twin placed some other way: their box overlapped someone else\'s, or no camera saw them clearly. Colours match the IDs in the videos.'
+    : 'With the geometric lift the twin knows where each passenger is and whether they sit or stand, so each is drawn as a plain figure. Switch to SAM 3D Body at the top of the page to see the estimated bodies. Colours match the IDs in the videos.';
+  const view3d = (function () {
+    const box = $('view3d'), cvs = $('c3d');
+    if (!window.THREE) { $('no3d').hidden = false; return null; }
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true }); } catch (e) { $('no3d').hidden = false; return null; }
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(38, 2, 0.1, 200);
+    const L = D.bus.L, BW = D.bus.W, GZ = D.floor.ground, HW = BW / 2;
+    const V = (x, y, z) => new THREE.Vector3(x - L / 2, z, -y);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x556070, 0.85));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(-4, 12, 6); scene.add(sun);
+    const col = (v) => new THREE.Color(css(v) || '#888');
+    const mats = {
+      ground: new THREE.MeshLambertMaterial(), floor: new THREE.MeshLambertMaterial(), seat: new THREE.MeshLambertMaterial(),
+      wall: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }),
+      edge: new THREE.LineBasicMaterial(), door: new THREE.MeshBasicMaterial({ transparent: true }),
+      truth: new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), cam: new THREE.MeshBasicMaterial(),
+    };
+    function theme() {
+      scene.background = col('--paper');
+      mats.ground.color = col('--city'); mats.floor.color = col('--block'); mats.seat.color = col('--rule');
+      mats.wall.color = col('--muted'); mats.edge.color = col('--muted'); mats.door.color = col('--bus');
+      mats.truth.color = col('--ink'); mats.cam.color = col('--ink');
+    }
+    theme();
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', theme); } catch (e) { /* old browsers */ }
+    new MutationObserver(theme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    // the bus and the kerb
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(L + 10, 12), mats.ground);
+    ground.rotation.x = -Math.PI / 2; ground.position.copy(V(L / 2, 1.5, GZ - 0.001)); scene.add(ground);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(L, -GZ, BW), mats.floor); floor.position.copy(V(L / 2, 0, GZ / 2)); scene.add(floor);
+    const shell = new THREE.BoxGeometry(L, 2.4, BW);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(shell), mats.edge); edges.position.copy(V(L / 2, 0, 1.2)); scene.add(edges);
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(L, 2.4), mats.wall); back.position.copy(V(L / 2, -HW, 1.2)); scene.add(back);
+    const doorMesh = {};
+    Object.entries(D.doors).forEach(([k, [a, b]]) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(b - a, 2.0, 0.05), mats.door.clone());
+      m.position.copy(V((a + b) / 2, HW, 1.0)); scene.add(m); doorMesh[k] = m;
+    });
+    const seatG = new THREE.BoxGeometry(0.42, 0.45, 0.4), backG = new THREE.BoxGeometry(0.08, 0.5, 0.4);
+    D.seats.forEach(([x, y]) => {
+      const s = new THREE.Mesh(seatG, mats.seat); s.position.copy(V(x, y, 0.225)); scene.add(s);
+      const b = new THREE.Mesh(backG, mats.seat); b.position.copy(V(x + 0.24, y, 0.7)); scene.add(b);
+    });
+
+    // people: a plain figure per track, and (SAM 3D Body) a mesh per track
+    const hsv = (h, s, v) => { const i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+      const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i % 6]; return new THREE.Color(r, g, b); };
+    const trackColor = (id) => hsv((id * 0.61803398875) % 1, 0.65, 0.95);
+    const standBody = new THREE.CylinderGeometry(0.16, 0.13, 1.25, 16), sitBody = new THREE.CylinderGeometry(0.17, 0.17, 0.7, 16);
+    const headG = new THREE.SphereGeometry(0.12, 16, 12);
+    const people = new Map();       // track id -> {fig, head, mesh, key, mat, label}
+    const labels = $('labels3d');
+    function person(id) {
+      let p = people.get(id);
+      if (p) return p;
+      const c = trackColor(id);
+      const mat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.65, metalness: 0.0, transparent: true });
+      const fig = new THREE.Mesh(standBody, mat), head = new THREE.Mesh(headG, mat);
+      scene.add(fig); scene.add(head);
+      const label = document.createElement('span'); label.textContent = id; label.style.color = `#${c.getHexString()}`; labels.appendChild(label);
+      p = { fig, head, mat, mesh: null, key: null, label, seen: -1 }; people.set(id, p); return p;
+    }
+    const truthG = new THREE.RingGeometry(0.2, 0.25, 28); const truths = [];
+
+    // SAM 3D Body meshes: index (which track has a body at which keyframe) and per-segment vertex files
+    let MI = null; const bodyAt = new Map(), bins = {}, loading = {};
+    if (LIFT) fetch('mesh_index.json').then((r) => r.json()).then((ix) => {
+      dirty = true; MI = ix; MI.index = new THREE.BufferAttribute(new Uint32Array(ix.faces), 1);
+      ix.segs.forEach((list, s) => list.forEach(([f, id, fl], i) => bodyAt.set(`${f}:${id}`, [s, i, fl])));
+      (ix.cams || []).forEach((c) => {
+        const m = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 12), mats.cam);
+        m.position.copy(V(...c.pos)); const d = V(c.fwd[0] + L / 2, c.fwd[1], c.fwd[2]);
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d.normalize()); scene.add(m);
+      });
+    }).catch(() => { $('bodynote').textContent += ' (The body meshes could not be loaded.)'; });
+    function needSeg(s) {
+      if (!MI || s < 0 || s >= MI.segs.length || bins[s] || loading[s]) return;
+      // vertex bytes, gzipped and base64-encoded (the page can only fetch text-like files)
+      loading[s] = fetch(`mesh_s${String(s).padStart(2, '0')}.txt`).then((r) => r.text()).then((t) => {
+        const raw = Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+        return new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      }).then((b) => { bins[s] = new Uint8Array(b); dirty = true; })
+        .catch(() => { loading[s] = null; });
+    }
+    function findBody(f, id) {
+      // the latest keyframe body of this track up to 1.5 s back, else the next one
+      const K = MI.key, k0 = Math.floor(f / K) * K;
+      for (const kf of [k0, k0 - K, k0 - 2 * K, k0 + K, k0 - 3 * K]) {
+        const b = bodyAt.get(`${kf}:${id}`);
+        if (b) { needSeg(b[0]); if (bins[b[0]]) return [`${kf}:${id}`, b]; }
+      }
+      return null;
+    }
+    function setBody(p, key, [s, i, fl]) {
+      if (p.key === key) return;
+      const nv = MI.nv, src = bins[s], o = i * nv * 3;
+      if (!p.mesh) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3)); g.setIndex(MI.index);
+        p.mesh = new THREE.Mesh(g, p.mat); scene.add(p.mesh);
+      }
+      const pos = p.mesh.geometry.attributes.position.array;
+      for (let j = 0; j < nv; j++) {
+        const a = o + 3 * j;
+        pos[3 * j] = (src[a] - 128) / 100; pos[3 * j + 1] = src[a + 2] / 255 * MI.zmax + fl; pos[3 * j + 2] = -(src[a + 1] - 128) / 100;
+      }
+      p.mesh.geometry.attributes.position.needsUpdate = true; p.mesh.geometry.computeVertexNormals(); p.mesh.geometry.computeBoundingSphere();
+      p.key = key;
+    }
+
+    // orbit camera
+    const views = {
+      all: { x: L / 2, az: Math.PI * 0.80, el: 0.62, r: 15.5 },
+      front: { x: (D.doors.front[0] + D.doors.front[1]) / 2 + 0.8, az: Math.PI * 0.86, el: 0.5, r: 7 },
+      rear: { x: (D.doors.rear[0] + D.doors.rear[1]) / 2, az: Math.PI * 0.86, el: 0.5, r: 7 },
+      top: { x: L / 2, az: Math.PI, el: 1.45, r: 14 },
+    };
+    let orb = { ...views.all }, dirty = true;
+    function placeCam() {
+      const t = V(orb.x, 0.3, 0.8);
+      cam.position.set(t.x + orb.r * Math.cos(orb.el) * Math.sin(orb.az), t.y + orb.r * Math.sin(orb.el), t.z + orb.r * Math.cos(orb.el) * Math.cos(orb.az));
+      cam.lookAt(t); dirty = true;
+    }
+    placeCam();
+    document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => { orb = { ...views[b.dataset.view] }; placeCam(); }));
+    const ptrs = new Map(); let pinch0 = null;
+    box.addEventListener('pointerdown', (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); box.setPointerCapture(e.pointerId); });
+    box.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      const [px, py] = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinch0) orb.r = Math.max(3, Math.min(30, orb.r * pinch0 / d)); pinch0 = d;
+      } else {
+        orb.az -= (e.clientX - px) * 0.008; orb.el = Math.max(0.05, Math.min(1.5, orb.el + (e.clientY - py) * 0.006));
+      }
+      placeCam();
+    });
+    const up = (e) => { ptrs.delete(e.pointerId); pinch0 = null; };
+    box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+    box.addEventListener('wheel', (e) => { e.preventDefault(); orb.r = Math.max(3, Math.min(30, orb.r * Math.exp(e.deltaY * 0.001))); placeCam(); }, { passive: false });
+    $('truth3d').addEventListener('change', () => { dirty = true; });
+    $('ids3d').addEventListener('change', () => { labels.hidden = !$('ids3d').checked; });
+
+    function resize() {
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); dirty = true;
+    }
+    new ResizeObserver(resize).observe(box); resize();
+    let onScreen = true;
+    new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; }).observe(box);
+
+    let lastF = -1;
+    function update(f) {
+      if (!onScreen) return;
+      if (f === lastF && !dirty) return;
+      lastF = f; dirty = false;
+      const open = (R.door[Math.floor(f / 5)] || 0) > 0;
+      Object.values(doorMesh).forEach((m) => { m.material.opacity = open ? 0.18 : 0.75; });
+      // twin tracks, interpolated between the 5 fps samples
+      const st = D.cabin_step, i0 = Math.min(Math.floor(f / st), D.scene3d.length - 1), w = (f - i0 * st) / st;
+      const a = D.scene3d[i0], b = D.scene3d[Math.min(i0 + 1, D.scene3d.length - 1)];
+      const nb = new Map(b.map((e) => [e[0], e]));
+      const live = new Set();
+      const W = box.clientWidth, H = box.clientHeight;
+      a.forEach(([id, x0, y0, sit, onb, obs]) => {
+        const n = nb.get(id); const x = n ? x0 + (n[1] - x0) * w : x0, y = n ? y0 + (n[2] - y0) * w : y0;
+        const p = person(id); live.add(id);
+        const fl = onb ? 0 : GZ;
+        let body = null;
+        if (LIFT && MI && obs) body = findBody(f, id);
+        if (body) {
+          setBody(p, body[0], body[1]);
+          p.mesh.visible = true; p.mesh.position.copy(V(x, y, 0)); p.mesh.position.y = 0;
+          p.fig.visible = p.head.visible = false;
+        } else {
+          if (p.mesh) p.mesh.visible = false;
+          p.fig.visible = p.head.visible = true;
+          p.fig.geometry = sit ? sitBody : standBody;
+          p.fig.position.copy(V(x, y, fl + (sit ? 0.45 + 0.35 : 0.625)));
+          p.head.position.copy(V(x, y, fl + (sit ? 1.25 : 1.55)));
+        }
+        p.mat.opacity = obs ? 1 : 0.35;
+        // ID label above the head
+        const top = V(x, y, fl + (sit ? 1.45 : 1.85)).project(cam);
+        if (top.z < 1 && Math.abs(top.x) < 1.05 && Math.abs(top.y) < 1.05) {
+          p.label.hidden = false; p.label.style.left = `${(top.x + 1) / 2 * W}px`; p.label.style.top = `${(1 - top.y) / 2 * H}px`;
+        } else p.label.hidden = true;
+      });
+      people.forEach((p, id) => { if (!live.has(id)) { p.fig.visible = p.head.visible = false; if (p.mesh) p.mesh.visible = false; p.label.hidden = true; } });
+      // true positions on board
+      const g = $('truth3d').checked ? D.cabin[Math.min(Math.floor(f / D.cabin_step), D.cabin.length - 1)][0] : [];
+      while (truths.length < g.length) { const m = new THREE.Mesh(truthG, mats.truth); m.rotation.x = -Math.PI / 2; scene.add(m); truths.push(m); }
+      truths.forEach((m, j) => { m.visible = j < g.length; if (m.visible) m.position.copy(V(g[j][1], g[j][2], 0.01)); });
+      if (MI) { const s = segs.findIndex((sg) => f < sg[1]); needSeg(s); needSeg(s + 1); }
+      renderer.render(scene, cam);
+    }
+    return { update };
+  })();
+
+  // ---------------------------------------------------------------- strip map
+  const strip = $('strip'); const X0 = 50, X1 = 1170, YL = 125;
+  const xs = (i) => X0 + i * (X1 - X0) / (S - 1);
+  let stopEls = [];
+  (function drawStrip() {
+    const maxv = Math.max(...D.stops.map((s) => Math.max(s.gt_board.length, s.gt_alight.length, s.tw_board.length, s.tw_alight.length)), 1);
+    const bh = 72 / maxv;
+    el('line', { x1: X0, x2: X1, y1: YL, y2: YL, stroke: 'var(--line)', 'stroke-width': 7, 'stroke-linecap': 'round' }, strip);
+    D.stops.forEach((s, i) => {
+      const x = xs(i);
+      const g = el('g', { class: 'stopbtn', tabindex: 0, role: 'button', 'aria-label': `Stop ${i + 1} ${s.name}` }, strip);
+      el('rect', { x: x - 25, y: 10, width: 50, height: 300, fill: 'transparent' }, g);
+      const hl = el('rect', { x: x - 24, y: 12, width: 48, height: 214, rx: 6, fill: 'var(--line-soft)', opacity: 0 }, g);
+      if (s.gt_board.length) el('rect', { x: x - 7, y: YL - 12 - s.gt_board.length * bh, width: 14, height: s.gt_board.length * bh, fill: 'var(--on)', rx: 2 }, g);
+      if (s.gt_alight.length) el('rect', { x: x - 7, y: YL + 12, width: 14, height: s.gt_alight.length * bh, fill: 'var(--off)', rx: 2 }, g);
+      el('circle', { cx: x + 13, cy: YL - 12 - s.tw_board.length * bh, r: 4, fill: 'var(--ink)' }, g);
+      el('circle', { cx: x + 13, cy: YL + 12 + s.tw_alight.length * bh, r: 4, fill: 'var(--ink)' }, g);
+      el('circle', { cx: x, cy: YL, r: 8, fill: 'var(--panel)', stroke: 'var(--line)', 'stroke-width': 3.5 }, g);
+      const t = el('text', { x: x - 3, y: 232, 'font-size': 12.5, fill: 'var(--ink)', transform: `rotate(40 ${x - 3} 232)`, 'text-anchor': 'start' }, g);
+      t.textContent = s.name;
+      const n = el('text', { x, y: 22, 'font-size': 11, fill: 'var(--muted)', 'text-anchor': 'middle', 'font-family': 'var(--f-mono)' }, g); n.textContent = i + 1;
+      g.addEventListener('click', () => selectStop(i, true));
+      g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectStop(i, true); } });
+      stopEls.push(hl);
+    });
+    // bus marker on the strip
+    const b = el('g', { id: 'stripbus' }, strip);
+    el('rect', { x: -11, y: YL - 7, width: 22, height: 14, rx: 4, fill: 'var(--bus)', stroke: 'var(--ink)', 'stroke-width': 1.5 }, b);
+  })();
+
+  // ---------------------------------------------------------------- ledger
+  let curStop = -1;
+  function verdictOn(pid) {
+    const t = tripOf[pid];
+    if (!t) return '';
+    if (!t.board_found) return '<span class="chip bad">boarding missed</span>';
+    return `<span class="chip ok">twin ID ${t.board_track}</span>`;
+  }
+  function verdictOff(pid) {
+    const t = tripOf[pid];
+    if (!t) return '';
+    if (!t.alight_found) return '<span class="chip bad">alighting missed</span>';
+    if (t.linked_reid) return `<span class="chip ok">recognised · boarded at ${R.stops[t.board_stop]}</span>`;
+    if (t.reid_board_stop != null) return `<span class="chip bad">matched to someone who boarded at ${R.stops[t.reid_board_stop]}</span>`;
+    if (!t.board_found) return '<span class="chip mid">not matched; their boarding was missed</span>';
+    return '<span class="chip mid">not matched to a boarding</span>';
+  }
+  function personCard(pid, on) {
+    const p = D.people[pid];
+    const route = p.role === 'passenger' ? `${R.stops[p.board]} → ${R.stops[p.alight]}` : '';
+    return `<div class="pcard">${face(pid)}<div><div class="who">Passenger ${pid}</div><div class="trip">${route}</div>${on ? verdictOn(pid) : verdictOff(pid)}</div></div>`;
+  }
+  function extraTwin(s, kind) {
+    // twin events at this stop that no true event matched (by ID: compare to the trips' tracks)
+    const tracks = new Set(D.trips.map((t) => kind === 'board' ? t.board_track : t.alight_track).filter((x) => x != null));
+    const ex = (kind === 'board' ? s.tw_board : s.tw_alight).filter((e) => !tracks.has(e.track));
+    return ex.length ? `Twin also counted ${ex.length} ${kind === 'board' ? 'boarding' : 'alighting'}${ex.length > 1 ? 's' : ''} that did not happen (ID ${ex.map((e) => e.track).join(', ')}).` : '';
+  }
+  function selectStop(i, seek) {
+    curStop = i; const s = D.stops[i];
+    stopEls.forEach((h, j) => h.setAttribute('opacity', j === i ? 1 : 0));
+    for (let j = 0; j < S; j++) { const c = $(`mstop${j}`); if (c) c.setAttribute('fill', j === i ? 'var(--line)' : 'var(--panel)'); }
+    $('sname').textContent = `${i + 1} · ${s.name}`;
+    $('sinfo').textContent = `doors open ${fmt(s.t_open)}–${fmt(s.t_close)} · load leaving: ${s.counts.gt_load} true, ${s.counts.tw_load} twin`;
+    $('onsum').textContent = `${s.gt_board.length} true · ${s.tw_board.length} twin`;
+    $('offsum').textContent = `${s.gt_alight.length} true · ${s.tw_alight.length} twin`;
+    $('onlist').innerHTML = s.gt_board.map((e) => personCard(e.pid, true)).join('') || '<p class="note">Nobody.</p>';
+    $('offlist').innerHTML = s.gt_alight.map((e) => personCard(e.pid, false)).join('') || '<p class="note">Nobody.</p>';
+    $('onextra').textContent = extraTwin(s, 'board'); $('offextra').textContent = extraTwin(s, 'alight');
+    if (seek) seekTo(Math.max(0, s.t_open - 4));
+  }
+
+  // ---------------------------------------------------------------- video + clock
+  const vid = $('vid'); let seg = -1, playing = false, pendingT = null;
+  const segs = R.segments;
+  const segOf = (f) => { for (let i = 0; i < segs.length; i++) if (f < segs[i][1]) return i; return segs.length - 1; };
+  let haveVideo = true;
+  vid.addEventListener('error', () => { haveVideo = false; $('novideo').hidden = false; });
+  function loadSeg(i, tLocal) {
+    seg = i; pendingT = tLocal;
+    vid.src = `seg${D.lift || ''}${String(i).padStart(2, '0')}.mp4`;
+    vid.playbackRate = +$('speed').value;
+  }
+  vid.addEventListener('loadedmetadata', () => { if (pendingT != null) { vid.currentTime = pendingT; pendingT = null; } vid.playbackRate = +$('speed').value; if (playing) vid.play().catch(() => {}); });
+  vid.addEventListener('ended', () => { if (seg < segs.length - 1) loadSeg(seg + 1, 0); else { playing = false; $('play').textContent = 'Play'; } });
+  let tNoVid = 0, last = performance.now();
+  const globalT = () => haveVideo && seg >= 0 ? segs[seg][0] / fps + (pendingT != null ? pendingT : vid.currentTime) : tNoVid;
+  function seekTo(t) {
+    t = Math.max(0, Math.min(T - 0.05, t)); const f = Math.floor(t * fps); const i = segOf(f);
+    tNoVid = t;
+    if (!haveVideo) return;
+    if (i !== seg) loadSeg(i, t - segs[i][0] / fps); else vid.currentTime = t - segs[i][0] / fps;
+  }
+  $('play').addEventListener('click', () => {
+    playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play';
+    if (haveVideo) { if (playing) vid.play().catch(() => {}); else vid.pause(); }
+  });
+  $('speed').addEventListener('change', () => { vid.playbackRate = +$('speed').value; });
+  $('scrub').addEventListener('input', (e) => seekTo(e.target.value / 1000 * T));
+  $('ticks').innerHTML = R.stop_t.map(([a]) => `<span style="left:${a / T * 100}%"></span>`).join('');
+  let lastStop = -1;
+  function frame() {
+    const now = performance.now();
+    if (!haveVideo && playing) tNoVid = Math.min(T, tNoVid + (now - last) / 1000 * +$('speed').value);
+    last = now;
+    const t = globalT(), f = Math.min(N - 1, Math.floor(t * fps));
+    $('clock').textContent = `${fmt(t)} / ${fmt(T)}`;
+    if (document.activeElement !== $('scrub')) $('scrub').value = Math.round(t / T * 1000);
+    const b = busAt(f); busG.setAttribute('transform', `translate(${b.xy[0].toFixed(1)} ${b.xy[1].toFixed(1)})`);
+    nowLab.setAttribute('x', Math.min(b.xy[0] + 24, 700)); nowLab.setAttribute('y', b.xy[1] - 22);
+    const kk = Math.min(S - 1, b.k + (b.w > 0.5 ? 1 : 0));
+    const door = (R.door[Math.floor(f / 5)] || 0) > 0;
+    $('tagdoor').hidden = !door;
+    $('tagstop').textContent = b.w > 0.02 && b.w < 0.98 ? `Driving to ${kk + 1} · ${R.stops[Math.min(S - 1, b.k + 1)]}` : `Stop ${kk + 1} · ${R.stops[kk]}`;
+    nowLab.textContent = b.w > 0.02 && b.w < 0.98 ? `→ ${R.stops[Math.min(S - 1, b.k + 1)]}` : (kk === 0 || kk === S - 1 ? '' : R.stops[kk]);
+    $('stripbus').setAttribute('transform', `translate(${xs(b.k + b.w).toFixed(1)} 0)`);
+    if (kk !== lastStop && (door || lastStop < 0)) { lastStop = kk; if (curStop !== kk) selectStop(kk, false); }
+    drawCabin(f); drawLoadCursor(t);
+    if (view3d) view3d.update(f, t);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- load chart
+  const load = $('load'); const LX0 = 44, LX1 = 985, LY0 = 222, LY1 = 16;
+  const lmax = Math.ceil(Math.max(...D.load_gt, ...D.load_tw) / 5) * 5 || 5;
+  const lx = (t) => LX0 + t / T * (LX1 - LX0), ly = (v) => LY0 - v / lmax * (LY0 - LY1);
+  for (let v = 0; v <= lmax; v += 5) {
+    el('line', { x1: LX0, x2: LX1, y1: ly(v), y2: ly(v), stroke: 'var(--rule)', 'stroke-width': 1 }, load);
+    const t = el('text', { x: LX0 - 8, y: ly(v) + 4, 'text-anchor': 'end' }, load); t.textContent = v;
+  }
+  R.stop_t.forEach(([a], i) => { if (i % 2 === 0) { const t = el('text', { x: lx(a), y: 244, 'text-anchor': 'middle' }, load); t.textContent = i + 1; }
+    el('line', { x1: lx(a), x2: lx(a), y1: LY0, y2: LY0 + 5, stroke: 'var(--muted)' }, load); });
+  const lt = el('text', { x: LX1, y: 258, 'text-anchor': 'end' }, load); lt.textContent = 'stop number at door opening';
+  const path = (arr) => arr.map((v, i) => `${i ? 'L' : 'M'}${lx(i).toFixed(1)} ${ly(v).toFixed(1)}`).join(' ');
+  el('path', { d: path(D.load_gt) + ` L${lx(D.load_gt.length - 1)} ${LY0} L${LX0} ${LY0} Z`, fill: 'var(--line-soft)', stroke: 'none' }, load);
+  el('path', { d: path(D.load_gt), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2 }, load);
+  el('path', { d: path(D.load_tw), fill: 'none', stroke: 'var(--line)', 'stroke-width': 2, 'stroke-dasharray': '6 3' }, load);
+  const cursor = el('line', { y1: LY1, y2: LY0, stroke: 'var(--bus)', 'stroke-width': 2.5 }, load);
+  function drawLoadCursor(t) { cursor.setAttribute('x1', lx(t)); cursor.setAttribute('x2', lx(t)); }
+  load.addEventListener('click', (ev) => { const r = load.getBoundingClientRect(); const x = (ev.clientX - r.left) / r.width * 1000; seekTo((x - LX0) / (LX1 - LX0) * T); });
+
+  // ---------------------------------------------------------------- OD
+  function drawOD(svg, M, ref) {
+    const n = M.length, c0 = 40, cs = (420 - c0 - 6) / n; const mx = Math.max(...M.flat(), 1);
+    for (let i = 0; i < n; i++) {
+      const a = el('text', { x: c0 - 6, y: c0 + i * cs + cs * 0.7, 'text-anchor': 'end', 'font-size': 9.5, fill: 'var(--muted)', 'font-family': 'var(--f-mono)' }, svg); a.textContent = i + 1;
+      const b = el('text', { x: c0 + i * cs + cs / 2, y: c0 - 8, 'text-anchor': 'middle', 'font-size': 9.5, fill: 'var(--muted)', 'font-family': 'var(--f-mono)' }, svg); b.textContent = i + 1;
+      for (let j = 0; j < n; j++) {
+        const v = M[i][j];
+        const r = el('rect', { x: c0 + j * cs + 0.5, y: c0 + i * cs + 0.5, width: cs - 1, height: cs - 1, fill: v ? 'var(--line)' : (j > i ? 'var(--paper)' : 'var(--panel)'), 'fill-opacity': v ? 0.25 + 0.75 * v / mx : 1 }, svg);
+        if (ref && v !== ref[i][j]) r.setAttribute('stroke', v > ref[i][j] ? 'var(--warn)' : 'var(--off)');
+        const tt = el('title', {}, r); tt.textContent = `${R.stops[i]} → ${R.stops[j]}: ${v}${ref ? ` (true ${ref[i][j]})` : ''}`;
+      }
+    }
+    const o = el('text', { x: 4, y: 14, 'font-size': 10, fill: 'var(--muted)', 'font-family': 'var(--f-mono)' }, svg); o.textContent = 'from ↓  to →';
+  }
+  drawOD($('odgt'), D.od_gt, null); drawOD($('odtw'), D.od_rl, D.od_gt);
+  $('odnote').textContent = `Every alighting the twin sees is matched to one earlier boarding by appearance (one assignment over the whole route). That gives ${D.rl_trips.length} trips; ${pct(main.od_acc_reid)} of the ${D.trips.length} true trips appear in its matrix with the right origin and destination. Outlined cells differ from the truth.`;
+
+  // ---------------------------------------------------------------- re-ID
+  (function drawReid() {
+    const svg = $('curve'); const names = Object.keys(D.reid);
+    const colors = ['var(--line)', 'var(--warn)'];
+    const X0c = 46, X1c = 505, Y0c = 260, Y1c = 14;
+    const sizes = names.length ? D.reid[names[0]].size_curve.map((c) => c.gallery) : [2, 64];
+    const gx = (g) => X0c + Math.log(g / sizes[0]) / Math.log(sizes[sizes.length - 1] / sizes[0]) * (X1c - X0c);
+    const LO = 0.8;
+    const gy = (v) => Y0c - (Math.max(v, LO) - LO) / (1 - LO) * (Y0c - Y1c);
+    [0.8, 0.85, 0.9, 0.95, 1].forEach((v) => { el('line', { x1: X0c, x2: X1c, y1: gy(v), y2: gy(v), stroke: 'var(--rule)' }, svg);
+      const t = el('text', { x: X0c - 6, y: gy(v) + 4, 'text-anchor': 'end' }, svg); t.textContent = `${Math.round(v * 100)}%`; });
+    sizes.forEach((g) => { const t = el('text', { x: gx(g), y: Y0c + 18, 'text-anchor': 'middle' }, svg); t.textContent = g; });
+    const xl = el('text', { x: X1c, y: Y0c + 34, 'text-anchor': 'end' }, svg); xl.textContent = 'candidates in the gallery (log scale)';
+    names.forEach((nm, i) => {
+      const c = D.reid[nm].size_curve;
+      el('path', { d: c.map((p, j) => `${j ? 'L' : 'M'}${gx(p.gallery).toFixed(1)} ${gy(p.rank1).toFixed(1)}`).join(' '), fill: 'none', stroke: colors[i], 'stroke-width': 2.5 }, svg);
+      c.forEach((p) => el('circle', { cx: gx(p.gallery), cy: gy(p.rank1), r: 3.5, fill: colors[i] }, svg));
+    });
+    $('curvelegend').innerHTML = names.map((nm, i) => `<span><i style="background:${colors[i]}"></i>${nm}</span>`).join('');
+    const tr = D.reid[names[0]];
+    if (tr) $('reidnote').textContent = `Each passenger's look when getting off is compared with everyone's look when getting on. With all ${tr.passengers} passengers as candidates, TransReID picks the right person first ${pct(tr.rank1_all)} of the time. Restricting the candidates to those the twin knows are on board at that moment (${tr.onboard_gallery_mean} on average) raises this to ${pct(tr.rank1_onboard)}. The twin does this end to end on its own detections: its door events carry an appearance signature, and every alighting is assigned to one open boarding over the whole route.`;
+    else $('reidnote').textContent = 'Appearance-only results are not in this build.';
+    const rows = D.table.filter((r) => r.trips_total);
+    const mx = Math.max(...rows.map((r) => r.trips_total), 1);
+    $('tripbars').innerHTML = rows.map((r) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:8px;align-items:center;margin:8px 0">
+      <div><div style="font-size:.9rem">${r.label}</div><div style="height:12px;border-radius:3px;background:var(--rule);overflow:hidden"><div style="height:100%;width:${r.trips_linked_reid / mx * 100}%;background:${r.note === 'main' ? 'var(--line)' : 'var(--muted)'}"></div></div></div>
+      <div class="mono" style="text-align:right">${(+r.trips_linked_reid).toFixed(1)}/${r.trips_total}</div></div>`).join('');
+  })();
+
+  // ---------------------------------------------------------------- configurations
+  (function table() {
+    const cols = [['trips_linked_reid', 'Trips closed', (v, r) => `${(+v).toFixed(1)}<span class="sd"> / ${r.trips_total}</span>`],
+      ['trips_linked', 'Same 3D track', (v, r) => `${(+v).toFixed(1)}<span class="sd"> / ${r.trips_total}</span>`],
+      ['onboard_count_mae', 'Count error', (v, r) => `${(+v).toFixed(2)}<span class="sd"> ±${(+r.onboard_count_mae_std).toFixed(2)}</span>`],
+      ['onboard_count_exact', 'Count exact', (v) => pct(v)],
+      ['events_tp', 'Door events found', (v, r) => `${(+v).toFixed(1)}<span class="sd"> / ${r.events_gt}</span>`],
+      ['events_pred', 'False events', (v, r) => (r.events_pred - r.events_tp).toFixed(1)],
+      ['od_acc_reid', 'OD agreement', (v) => pct(v)],
+      ['idf1_3d', '3D IDF1', (v) => (+v).toFixed(2)]];
+    $('cfg').innerHTML = `<thead><tr><th>Configuration</th>${cols.map((c) => `<th>${c[1]}</th>`).join('')}</tr></thead><tbody>` +
+      D.table.map((r) => `<tr class="${r.note === 'main' ? 'main' : ''}"><td>${r.label}</td>${cols.map((c) => `<td>${r[c[0]] == null ? '—' : c[2](r[c[0]], r)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  })();
+
+  function setLift(v) {
+    if (v === LIFT) return;
+    try { sessionStorage.setItem('twin_t', String(globalT())); } catch (e) { /* storage blocked: start from the beginning */ }
+    location.hash = v ? 's3d' : 'geo';
+    location.reload();
+  }
+  $('liftgeo').addEventListener('click', () => setLift(''));
+  $('lifts3d').addEventListener('click', () => setLift('_s3d'));
+
+  selectStop(0, false);
+  if (tStart > 0) seekTo(tStart); else if (haveVideo) loadSeg(0, 0);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
